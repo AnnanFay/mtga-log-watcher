@@ -24,7 +24,7 @@ setup(
         'mtga_log_watcher': ['assets/*']
     },
     install_requires=[
-        "importlib_resources ; python_version<'3.7'",
+        # "importlib_resources ; python_version<'3.7'",
         'pystray',
         'plyer',
         'humanize',
@@ -32,7 +32,7 @@ setup(
         'pillow'
     ],
     entry_points={
-        'console_scripts': ['mtga-log-watcher=mtga_log_watcher:run'],
+        # 'console_scripts': ['mtga-log-watcher=mtga_log_watcher:run'],
     },
     include_package_data=True,
     zip_safe=True
