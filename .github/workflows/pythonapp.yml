@@ -41,7 +41,7 @@ jobs:
       uses: svenstaro/upload-release-action@v1-release
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
-        file: target/release/mything
-        asset_name: mything
+        file: dist/mtga-log-watcher.exe
+        asset_name: mtga-log-watcher.exe
         tag: ${{ github.ref }}
         overwrite: true
