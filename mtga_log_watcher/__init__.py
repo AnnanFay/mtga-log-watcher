@@ -89,11 +89,6 @@ def backup(filename):
     basename = os.path.basename(filename)
     new_filename = '{}/{}_{}'.format(TARGET_DIR, mstring, basename)
 
-    print('backup')
-    print('    FROM :', filename)
-    print('    TO   :', new_filename)
-
-    mkdir_p(TARGET_DIR)
 
     # check if file already exists, and has the same size.
     # if it does then we don't need to backup
@@ -102,11 +97,18 @@ def backup(filename):
         from_size = os.path.getsize(filename)
         to_size = os.path.getsize(new_filename)
         if from_size == to_size:
+            # we don't need to do anything
             return
 
         # otherwise they are different in size, 
         # but we cannot overwrite.
         raise Error("Cannot rename, file exists but is different")
+
+    print('backup')
+    print('    FROM :', filename)
+    print('    TO   :', new_filename)
+
+    mkdir_p(TARGET_DIR)
 
     try:
         # Rename might fail if a tracker has a file lock
