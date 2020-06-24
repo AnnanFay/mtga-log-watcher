@@ -26,7 +26,7 @@ Simple log update background script.
 Requires : psutil plyer
 
 When run without arguments will spawn a background process which watching
-the `output_log.txt` and tries to back it up
+the `Player.log` and tries to back it up
 
 Currently the background process must be manually killed through task 
 manager or kill commands.
@@ -36,7 +36,7 @@ Run with --watch to run in foreground.
 """
 
 LOG_DIR = os.path.expandvars(r"%APPDATA%\..\LocalLow\Wizards Of The Coast\MTGA")
-WATCH_LOG = os.path.join(LOG_DIR, "output_log.txt")
+WATCH_LOG = os.path.join(LOG_DIR, "Player.log")
 TARGET_DIR = os.path.join(LOG_DIR, "./named_logs")
 WATCHER_LOG = os.path.join(LOG_DIR, "log_watcher.log")
 WATCHER_ERR_LOG = os.path.join(LOG_DIR, "log_watcher.err")
@@ -52,9 +52,12 @@ print("using python:", sys.version)
 
 
 def notify(message):
-    notification.notify(
-        title="MTGA Log Watcher", message=message, app_name="MTGA Log Watcher"
-    )
+    try:
+        notification.notify(
+            title="MTGA Log Watcher", message=message, app_name="MTGA Log Watcher"
+        )
+    except:
+        print('Notify failed.')
 
 
 def log_error(err):
@@ -80,7 +83,7 @@ def mkdir_p(path):
             raise
 
 
-def backup(filename):
+def backup(filename, force=False):
     mtimestamp = os.path.getmtime(filename)
     mdatetime = datetime.fromtimestamp(mtimestamp)
     mstring = mdatetime.strftime("%Y-%m-%d_%H-%M-%S")
@@ -91,7 +94,7 @@ def backup(filename):
     # check if file already exists, and has the same size.
     # if it does then we don't need to backup
 
-    if os.path.exists(new_filename):
+    if not force and os.path.exists(new_filename):
         from_size = os.path.getsize(filename)
         to_size = os.path.getsize(new_filename)
         if from_size == to_size:
@@ -155,7 +158,7 @@ def monitor_log(icon):
 
         icon.update_menu()
 
-        sleep(1.0)  # seconds
+        sleep(2.0)  # seconds
 
         arena_proc = get_arena()
 
