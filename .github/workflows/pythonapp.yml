@@ -33,7 +33,7 @@ jobs:
 #        pytest
     - name: Build with PyInstaller
       run: |
-        python -m pip install pyinstaller
+        python -m pip install pyinstaller pypiwin32
         python -m PyInstaller -y onefile.spec
     - name: Upload binaries to release
       uses: svenstaro/upload-release-action@v1-release
