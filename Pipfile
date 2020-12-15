@@ -4,11 +4,11 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-pystray = ">=0.16.0"
 plyer = ">=1.4.3"
 psutil = ">=5.7.0"
 pillow = ">=7.1.2"
 humanize = ">=2.4.0"
+pyside6 = "*"
 
 [dev-packages]
 

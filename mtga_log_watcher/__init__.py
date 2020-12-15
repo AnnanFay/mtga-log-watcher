@@ -1,25 +1,35 @@
-#!/usr/bin/env python3.7
+
 import re
 import os
 import sys
-from pystray import Icon, Menu, MenuItem
-from plyer import notification
-from PIL import Image
-import humanize
-from time import sleep
-from threading import Thread
-from datetime import date, datetime
 import traceback
 import errno
 import shutil
+
+from time import sleep
+from threading import Thread
+from datetime import date, datetime
+from collections import namedtuple
+from importlib import resources as pkg_resources
+from functools import partial
+
+import humanize
+from plyer import notification
 from psutil import process_iter, NoSuchProcess, AccessDenied, ZombieProcess
 
-try:
-    import importlib.resources as pkg_resources
-except ImportError:
-    import importlib_resources as pkg_resources
+# from pystray import Icon, Menu, MenuItem
+import PySide6
+from PySide6.QtGui import QIcon, QPixmap, QImage
+from PySide6.QtWidgets import (
+    QApplication,
+    QMenu,
+    QSystemTrayIcon,
+)
 
 from . import assets
+
+# NOTE: This must be last.
+from __feature__ import snake_case, true_property
 
 """
 Simple log update background script.
@@ -72,6 +82,15 @@ def log_error(err):
         )
     )
 
+
+def is_process_running(pred):
+    for proc in process_iter():
+        try:
+            if pred(proc):
+                return proc
+        except (NoSuchProcess, AccessDenied, ZombieProcess, OSError):
+            pass
+    return False
 
 def mkdir_p(path):
     try:
@@ -148,16 +167,13 @@ def get_log_created():
 LAST_BACKUP = False
 
 
-def monitor_log(icon):
+def monitor_log(stop):
     global LAST_BACKUP
     print("Watching")
     big_log_notified = False
 
     backup_failures = 0
-    while not TERMINATE:
-
-        icon.update_menu()
-
+    while not stop():
         sleep(2.0)  # seconds
 
         arena_proc = get_arena()
@@ -218,76 +234,115 @@ def monitor_log(icon):
     print("Watcher: Stopping")
 
 
+def rebuild_menu(menu, app, watcher):
+    actions = menu.actions()
+    # print('rebuilding menu', len(actions))
+
+    for i, md in enumerate(MENU_DESCS):
+        label = md.label() if callable(md.label) else md.label
+        enabled = md.enabled() if callable(md.enabled) else md.enabled
+        callback = partial(md.callback, app, watcher)
+
+        try:
+            # update existing
+            action = actions[i]
+            if action.text != label:
+                print(action.text, '->', label)
+            action.text = label
+            action.callback = callback
+        except IndexError:
+            # add new
+            action = menu.add_action(label, callback)
+        action.enabled = enabled
+
+def build_gui(watcher):
+
+    app = QApplication(title="title here")
+
+    menu = QMenu()
+    rebuild_menu(menu, app, watcher)
+
+    with pkg_resources.path(assets, ICON_PATH) as icon_res_path:
+        image = QImage(str(icon_res_path))
+        print(icon_res_path, image)
+
+    pixmap = QPixmap.from_image(image)
+    icon = QIcon(pixmap)
+    systray = QSystemTrayIcon(icon)
+    systray.set_context_menu(menu)
+    systray.show()
+
+    # systray must be returned or it will be garbage collected
+    return app, menu, systray
+
+def noop(*args):
+    pass
+
+def quit(app, watcher, *args):
+    global TERMINATE
+    print("Watcher: Marking")
+    TERMINATE = True
+    # watcher.join()
+
+    print("App: Stopping")
+    app.quit()
+    # icon.stop()
+
+
+def last_log_backup_text(*args):
+    if LAST_BACKUP:
+        htdelta = humanize.naturaldelta(LAST_BACKUP - datetime.now())
+        return "Last Backup: {}".format(htdelta)
+    else:
+        return "Last Backup: Unknown"
+
+def log_age_text(*args):
+    if get_log_size():
+        cdate = get_log_created()
+        tdelta = cdate - datetime.now()
+        return "Log age : {}".format(humanize.naturaldelta(tdelta))
+    else:
+        return "Log age : N/A"
+
+def get_log_size_text(*args):
+    log_size = get_log_size()
+    if log_size:
+        size = humanize.naturalsize(log_size, binary=True)
+        return "Log Size: {}".format(size)
+    else:
+        return "Log Size: N/A"
+
+def arena_status_text(*args):
+    if get_arena():
+        return "Arena is on!"
+    else:
+        return "[Start Arena]"
+
+menu_desc = namedtuple('menu_desc', ('label', 'callback', 'enabled'))
+MENU_DESCS = (
+    menu_desc(label="Quit",               callback=quit, enabled=True),
+    menu_desc(label=arena_status_text,    callback=noop, enabled=lambda: not get_arena()),
+    menu_desc(label=get_log_size_text,    callback=noop, enabled=False),
+    menu_desc(label=log_age_text,         callback=noop, enabled=False),
+    menu_desc(label=last_log_backup_text, callback=noop, enabled=False),
+)
+
 def watch():
-    def noop(icon, item):
-        pass
+    def stop():
+        rebuild_menu(menu, app, watcher)
+        return TERMINATE
 
-    def quit(icon, item):
-        global TERMINATE
-        print("Watcher: Marking")
-        TERMINATE = True
-        watcher.join()
+    watcher = Thread(target=monitor_log, args=(stop,))
 
-        print("Icon: Stopping")
-        icon.stop()
+    app, menu, systray = build_gui(watcher)
 
-    def last_log_backup_text(arg):
-        if LAST_BACKUP:
-            htdelta = humanize.naturaldelta(LAST_BACKUP - datetime.now())
-            return "Last Backup: {}".format(htdelta)
-        else:
-            return "Last Backup: Unknown"
-
-    def log_age_text(arg):
-        if get_log_size():
-            cdate = get_log_created()
-            tdelta = cdate - datetime.now()
-            return "Log age : {}".format(humanize.naturaldelta(tdelta))
-        else:
-            return "Log age : N/A"
-
-    def get_log_size_text(arg):
-        log_size = get_log_size()
-        if log_size:
-            size = humanize.naturalsize(log_size, binary=True)
-            return "Log Size: {}".format(size)
-        else:
-            return "Log Size: N/A"
-
-    def arena_status_text(arg):
-        if get_arena():
-            return "Arena is on!"
-        else:
-            return "[Start Arena]"
-
-    menu = Menu(
-        MenuItem("Quit", quit, default=True),
-        MenuItem(arena_status_text, noop, enabled=lambda x: not get_arena()),
-        MenuItem(get_log_size_text, noop, enabled=False),
-        MenuItem(log_age_text, noop, enabled=False),
-        MenuItem(last_log_backup_text, noop, enabled=False),
-    )
-
-    icon_image = Image.open(pkg_resources.open_binary(assets, ICON_PATH))
-
-    icon = Icon(
-        name="MTGA Log Watcher Icon",
-        icon=icon_image,
-        title="MTGA Log Watcher",
-        menu=menu,
-    )
-
-    watcher = Thread(target=monitor_log, args=(icon,))
     watcher.start()
-    icon.run()
+    app.exec_()
     print("Exiting")
 
 
-def is_process_running(pred):
-    for proc in process_iter():
-        try:
-            if pred(proc):
-                return proc
-        except (NoSuchProcess, AccessDenied, ZombieProcess, OSError):
-            pass
-    return False
+def main():
+    watch()
+
+if __name__ == '__main__':
+    main()
