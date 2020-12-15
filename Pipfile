@@ -11,6 +11,8 @@ humanize = ">=2.4.0"
 pyside6 = "*"
 
 [dev-packages]
+pyinstaller = "*"
+pypiwin32 = "*"
 
 [requires]
 python_version = "3.8"

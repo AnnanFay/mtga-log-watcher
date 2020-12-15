@@ -1,4 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
 
 block_cipher = None
 
@@ -7,8 +8,10 @@ data_files = [
          ( 'README.md', '.' )
 ]
 
+spec_root = os.path.abspath(SPECPATH)
+
 a = Analysis(['cli.py'],
-             pathex=['F:\\GitHub\\mtga-log-watcher'],
+             pathex=[spec_root],
              binaries=[],
              datas=data_files,
              hiddenimports=[],
